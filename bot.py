@@ -1,68 +1,104 @@
-import os
-import logging
-from flask import Flask
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 import firebase_admin
 from firebase_admin import credentials, db
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import (
+    ApplicationBuilder,
+    CallbackQueryHandler,
+    CommandHandler,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
 
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+# Firebase Initialize
+cred = credentials.Certificate("firebase_key.json")
+firebase_admin.initialize_app(
+    cred, {"databaseURL": "https://flash-1d21e-default-rtdb.firebaseio.com/"}
+)
 
-try:
-    cred = credentials.Certificate("firebase_key.json")
-    firebase_admin.initialize_app(cred, {
-        'databaseURL': 'https://flash-1d21e-default-rtdb.europe-west1.firebasedatabase.app'
-    })
-    print("Firebase ချိတ်ဆက်မှု အောင်မြင်ပါသည်။")
-except Exception as e:
-    print(f"Firebase ချိတ်ဆက်ရာတွင် အမှားရှိပါသည်: {e}")
+BOT_TOKEN = "8909968169:AAHkOH3mrnJ-GQSIV0rzBnb9bpdS5AtaGpI"
 
-TOKEN = "8909968169:AAHkOH3mrnJ-GQSIV0rzBnb9bpdS5AtaGpI"
-
-app_flask = Flask(__name__)
-application = ApplicationBuilder().token(TOKEN).build()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("ARIES BETBOT Admin Bot သို့ ကြိုဆိုပါသည်။ Check ID များကို ဤနေရာတွင် စစ်ဆေးပေးမည် ဖြစ်ပါသည်။")
+    await update.message.reply_text(
+        "⚡ ARIES BETBOT Admin Bot မှ ကြိုဆိုပါတယ် ⚡\n\nCheck ID (ဥပမာ - ARIES-12345) ကို ပို့ပေးပါ၊ ဖွင့်ရန်/ပိတ်ရန် စီမံနိုင်ပါတယ်။"
+    )
 
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+# Check ID ရောက်လာတဲ့အခါ ဖွင့်ရန်/ပိတ်ရန် ခလုတ်ပြပေးမယ့် ပုံစံ
+async def handle_check_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
+
     if text.startswith("ARIES-"):
         check_id = text
+        ref = db.reference(f"users/{check_id}")
+        user_data = ref.get()
+
         keyboard = [
-            [InlineKeyboardButton("✅ APPROVE (ခွင့်ပြုမည်)", callback_data=f"approve_{check_id}")]
+            [
+                InlineKeyboardButton(
+                    "✅ အကောင့်ဖွင့်မည် (Approve)",
+                    callback_data=f"approve_{check_id}",
+                ),
+                InlineKeyboardButton(
+                    "❌ အကောင့်ပိတ်မည် (Block)", callback_data=f"block_{check_id}"
+                ),
+            ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
+
+        status_text = (
+            "လက်ရှိ အခြေအနေ: ဖွင့်ထားသည်"
+            if user_data and user_data.get("status")
+            else "လက်ရှိ အခြေအနေ: ပိတ်ထားသည်/မရှိသေးပါ"
+        )
+
         await update.message.reply_text(
-            f"📥 **Check ID အသစ် ရောက်ရှိလာပါပြီ**\n\nID: `{check_id}`\n\nခွင့်ပြုရန် အောက်ပါခလုတ်ကို နှိပ်ပါ။",
+            f"🔍 Check ID: <code>{check_id}</code>\n{status_text}\n\nဒီအကောင့်ကို ဘာလုပ်မလဲ ရွေးချယ်ပါ -",
             reply_markup=reply_markup,
-            parse_mode="Markdown"
+            parse_mode="HTML",
         )
     else:
-        await update.message.reply_text("ကျေးဇူးပြု၍ မှန်ကန်သော ARIES Check ID ကို ပို့ပေးပါ။")
+        await update.message.reply_text(
+            "⚠️ မှန်ကန်သော Check ID ပုံစံ (ဥပမာ: ARIES-XXXXX) မဟုတ်ပါ။"
+        )
 
-async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+# ခလုတ်နှိပ်လိုက်တဲ့အခါ Firebase မှာ True/False ပြောင်းပေးမယ့် the logic
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+
     data = query.data
-    if data.startswith("approve_"):
-        check_id = data.split("_")[1]
-        try:
-            ref = db.reference(f'users/{check_id}')
-            ref.update({'status': True})
-            await query.edit_message_text(
-                text=f"✅ Check ID: `{check_id}` ကို အောင်မြင်စွာ ခွင့်ပြု (Approve) ပေးလိုက်ပါပြီ။",
-                parse_mode="Markdown"
-            )
-        except Exception as e:
-            await query.edit_message_text(text=f"❌ အမှားအယွင်း ရှိနေပါသည်: {str(e)}")
+    action, check_id = data.split("_", 1)
+    ref = db.reference(f"users/{check_id}")
 
-@app_flask.route('/')
-def index():
-    return "ARIES BETBOT Admin Bot is running!"
+    if action == "approve":
+        ref.update({"status": True})
+        await query.edit_message_text(
+            text=f"✅ Check ID: <code>{check_id}</code> ကို အောင်မြင်စွာ **ဖွင့်ပေးလိုက်ပါပြီ**။",
+            parse_mode="HTML",
+        )
+    elif action == "block":
+        ref.update({"status": False})
+        await query.edit_message_text(
+            text=f"❌ Check ID: <code>{check_id}</code> ကို အောင်မြင်စွာ **ပိတ်လိုက်ပါပြီ**။",
+            parse_mode="HTML",
+        )
 
-if __name__ == '__main__':
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
-    application.add_handler(CallbackQueryHandler(button_callback))
-    application.run_polling()
+
+def main():
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(
+        MessageHandler(filters.TEXT & (~filters.COMMAND), handle_check_id)
+    )
+    app.add_handler(CallbackQueryHandler(button_handler))
+
+    print("Bot is running...")
+    app.run_polling()
+
+
+if __name__ == "__main__":
+    main()
