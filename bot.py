@@ -1,5 +1,6 @@
 import os
 import threading
+import time
 from flask import Flask
 import firebase_admin
 from firebase_admin import credentials, db
@@ -60,6 +61,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             minutes = int(text)
             duration_ms = minutes * 60 * 1000
+            current_time_ms = int(time.time() * 1000)
 
             # Firebase သို့ အချိန်နှင့်တကွ ဖွင့်ပေးခြင်း
             ref = db.reference(f"users/{check_id}")
@@ -68,7 +70,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "status": True,
                     "mode": "timed",
                     "duration": duration_ms,
-                    "startTime": db.SERVER_TIMESTAMP,
+                    "startTime": current_time_ms,
                 }
             )
 
@@ -143,7 +145,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     data = query.data
     user_id = update.effective_user.id
-    chat_id = query.message.chat_id
 
     if data.startswith("mode_always_"):
         check_id = data.replace("mode_always_", "")
@@ -158,7 +159,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data.startswith("mode_timed_"):
         check_id = data.replace("mode_timed_", "")
-        # ဒီ Admin အတွက် ဘယ် Check ID ကို အချိန်ပေးရမလဲ မှတ်ထားမည်
         waiting_minutes[user_id] = check_id
 
         await query.edit_message_text(
