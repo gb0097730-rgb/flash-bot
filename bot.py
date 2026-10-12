@@ -13,7 +13,7 @@ from telegram.ext import (
     filters,
 )
 
-# Render အတွက် Port error မတက်အောင် Web Server အသေးစား တစ်ခု ဖန်တီးခြင်း
+# Render အတွက် Port error မတက်အောင် Web Server အသေးစား
 web_app = Flask(__name__)
 
 
@@ -40,46 +40,93 @@ firebase_admin.initialize_app(
 
 BOT_TOKEN = "8909968169:AAHkOH3mrnJ-GQSIV0rzBnb9bpdS5AtaGpI"
 
+# Admin ရိုက်ထည့်မယ့် မိနစ်များကို ခေတ္တမှတ်ထားရန်
+user_states = {}
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "⚡ FLASH BETBOT Admin Bot မှ ကြိုဆိုပါတယ် ⚡\n\nCheck ID ကို ပို့ပေးပါ၊ ဖွင့်ရန်/ပိတ်ရန် စီမံနိုင်ပါသည်။"
+        "⚡ FLASH BETBOT Admin Bot ⚡\n\nCheck ID (ဥပမာ - FLASH-12345) ကို ပို့ပေးပါ။"
     )
 
 
-async def handle_check_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
+    user_id = update.effective_user.id
 
+    # Admin က မိနစ်အရေအတွက် ရိုက်ထည့်နေချိန်
+    if user_id in user_states and user_states[user_id].get("waiting_for_minutes"):
+        check_id = user_states[user_id]["check_id"]
+        try:
+            minutes = int(text)
+            duration_ms = minutes * 60 * 1000
+
+            # Firebase တွင် အချိန်နှင့်တကွ ဖွင့်ပေးခြင်း
+            ref = db.reference(f"users/{check_id}")
+            ref.update(
+                {
+                    "status": True,
+                    "mode": "timed",
+                    "duration": duration_ms,
+                    "startTime": db.SERVER_TIMESTAMP,
+                }
+            )
+
+            del user_states[user_id]
+            await update.message.reply_text(
+                f"✅ Check ID: <code>{check_id}</code> ကို **{minutes} မိနစ်** စာ အောင်မြင်စွာ ဖွင့်ပေးလိုက်ပါပြီ။",
+                parse_mode="HTML",
+            )
+            return
+        except ValueError:
+            await update.message.reply_text(
+                "⚠️ ကျေးဇူးပြု၍ ဂဏန်းဖြင့်သာ (ဥပမာ: 10 သို့မဟုတ် 20) တိတိကျကျ ရိုက်ထည့်ပါ။"
+            )
+            return
+
+    # Check ID ပို့လာသည့်အခါ
     if text.upper().startswith("FLASH"):
         check_id = text.upper()
+        user_states[user_id] = {"check_id": check_id}
         ref = db.reference(f"users/{check_id}")
         user_data = ref.get()
 
         keyboard = [
             [
                 InlineKeyboardButton(
-                    "✅ အကောင့်ဖွင့်မည် (Approve)",
-                    callback_data=f"approve_{check_id}",
-                ),
+                    "♾️ အမြဲတမ်း ဖွင့်မည် (Always)",
+                    callback_data=f"mode_always_{check_id}",
+                )
+            ],
+            [
                 InlineKeyboardButton(
-                    "❌ အကောင့်ပိတ်မည် (Block)", callback_data=f"block_{check_id}"
-                ),
-            ]
+                    "⏳ အချိန်သတ်မှတ် ဖွင့်မည် (Timed)",
+                    callback_data=f"mode_timed_{check_id}",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    "❌ အကောင့်ပိတ်မည် (Block / Reset)",
+                    callback_data=f"block_{check_id}",
+                )
+            ],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         is_active = False
+        mode = "none"
         if user_data and isinstance(user_data, dict):
             is_active = user_data.get("status", False)
+            mode = user_data.get("mode", "none")
 
         status_text = (
-            "လက်ရှိ အခြေအနေ: ဖွင့်ထားသည်"
+            f"လက်ရှိ အခြေအနေ: ဖွင့်ထားသည် ({mode})"
             if is_active
-            else "လက်ရှိ အခြေအနေ: ပိတ်ထားသည်/မရှိသေးပါ"
+            else "လက်ရှိ အခြေအနေ: ပိတ်ထားသည်"
         )
 
         await update.message.reply_text(
-            f"🔍 Check ID: <code>{check_id}</code>\n{status_text}\n\nဒီအကောင့်ကို ဘာလုပ်မလဲ ရွေးချယ်ပါ -",
+            f"🔍 Check ID: <code>{check_id}</code>\n{status_text}\n\nဘယ်လို ပုံစံမျိုး ဖွင့်ပေးမလဲ ရွေးချယ်ပါ -",
             reply_markup=reply_markup,
             parse_mode="HTML",
         )
@@ -94,35 +141,56 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     data = query.data
-    action, check_id = data.split("_", 1)
-    ref = db.reference(f"users/{check_id}")
+    user_id = update.effective_user.id
 
-    if action == "approve":
-        ref.update({"status": True})
+    if data.startswith("mode_always_"):
+        check_id = data.replace("mode_always_", "")
+        ref = db.reference(f"users/{check_id}")
+        ref.update(
+            {"status": True, "mode": "always", "startTime": None, "duration": None}
+        )
         await query.edit_message_text(
-            text=f"✅ Check ID: <code>{check_id}</code> ကို အောင်မြင်စွာ **ဖွင့်ပေးလိုက်ပါပြီ**။",
+            text=f"✅ Check ID: <code>{check_id}</code> ကို **အမြဲတမ်း (Time Limit မပါဘဲ)** ဖွင့်ပေးလိုက်ပါပြီ။",
             parse_mode="HTML",
         )
-    elif action == "block":
-        ref.update({"status": False})
+
+    elif data.startswith("mode_timed_"):
+        check_id = data.replace("mode_timed_", "")
+        if user_id in user_states:
+            user_states[user_id]["waiting_for_minutes"] = True
+        else:
+            user_states[user_id] = {
+                "check_id": check_id,
+                "waiting_for_minutes": True,
+            }
         await query.edit_message_text(
-            text=f"❌ Check ID: <code>{check_id}</code> ကို အောင်မြင်စွာ **ပိတ်လိုက်ပါပြီ**။",
+            text=f"⏳ Check ID: <code>{check_id}</code> အတွက် **ဘယ်နှစ်မိနစ်** သုံးခွင့်ပေးမလဲ? (ဥပမာ: 10 သို့မဟုတ် 15 လို့ ရိုက်ပြီး ပို့ပေးပါ)",
+            parse_mode="HTML",
+        )
+
+    elif data.startswith("block_"):
+        check_id = data.replace("block_", "")
+        ref = db.reference(f"users/{check_id}")
+        # ပိတ်လိုက်လျှင် အချိန်နှင့် အချက်အလက်များ 0/False ဖြစ်သွားမည်
+        ref.update(
+            {"status": False, "mode": "blocked", "startTime": 0, "duration": 0}
+        )
+        await query.edit_message_text(
+            text=f"❌ Check ID: <code>{check_id}</code> ကို **ပိတ်လိုက်ပါပြီ** (အချိန် 0 သို့ ပြန်ရောက်သွားပါပြီ)။",
             parse_mode="HTML",
         )
 
 
 def main():
-    # Flask server ကို background မှာ သပ်သပ် run မယ်
     t = threading.Thread(target=run_web)
     t.daemon = True
     t.start()
 
-    # Telegram Bot ကို run မယ်
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(
-        MessageHandler(filters.TEXT & (~filters.COMMAND), handle_check_id)
+        MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message)
     )
     app.add_handler(CallbackQueryHandler(button_handler))
 
