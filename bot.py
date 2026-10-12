@@ -1,3 +1,6 @@
+import os
+import threading
+from flask import Flask
 import firebase_admin
 from firebase_admin import credentials, db
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -10,7 +13,21 @@ from telegram.ext import (
     filters,
 )
 
-# Firebase Initialize (Region URL အမှန်နှင့်အတူ)
+# Render အတွက် Port error မတက်အောင် Web Server အသေးစား တစ်ခု ဖန်တီးခြင်း
+web_app = Flask(__name__)
+
+
+@web_app.route("/")
+def home():
+    return "Flash Bot is running!"
+
+
+def run_web():
+    port = int(os.environ.get("PORT", 10000))
+    web_app.run(host="0.0.0.0", port=port)
+
+
+# Firebase Initialize
 cred = credentials.Certificate("firebase_key.json")
 firebase_admin.initialize_app(
     cred,
@@ -26,15 +43,13 @@ BOT_TOKEN = "8909968169:AAHkOH3mrnJ-GQSIV0rzBnb9bpdS5AtaGpI"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "⚡ FLASH BETBOT Admin Bot မှ ကြိုဆိုပါတယ် ⚡\n\nCheck ID (ဥပမာ - FLASH-12345) ကို ပို့ပေးပါ၊ ဖွင့်ရန်/ပိတ်ရန် စီမံနိုင်ပါသည်။"
+        "⚡ FLASH BETBOT Admin Bot မှ ကြိုဆိုပါတယ် ⚡\n\nCheck ID ကို ပို့ပေးပါ၊ ဖွင့်ရန်/ပိတ်ရန် စီမံနိုင်ပါသည်။"
     )
 
 
-# Check ID ရောက်လာတဲ့အခါ ဖွင့်ရန်/ပိတ်ရန် ခလုတ်ပြပေးမယ့် ပုံစံ
 async def handle_check_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
 
-    # FLASH နဲ့စတဲ့ စာသားမှန်သမျှကို လက်ခံရန် (စာလုံးအကြီး/အသေး မရွေး)
     if text.upper().startswith("FLASH"):
         check_id = text.upper()
         ref = db.reference(f"users/{check_id}")
@@ -74,7 +89,6 @@ async def handle_check_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
-# ခလုတ်နှိပ်လိုက်တဲ့အခါ Firebase မှာ True/False ပြောင်းပေးမယ့် logic
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -98,6 +112,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def main():
+    # Flask server ကို background မှာ သပ်သပ် run မယ်
+    t = threading.Thread(target=run_web)
+    t.daemon = True
+    t.start()
+
+    # Telegram Bot ကို run မယ်
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
