@@ -40,8 +40,8 @@ firebase_admin.initialize_app(
 
 BOT_TOKEN = "8909968169:AAHkOH3mrnJ-GQSIV0rzBnb9bpdS5AtaGpI"
 
-# Admin ရိုက်ထည့်မယ့် မိနစ်များကို ခေတ္တမှတ်ထားရန်
-user_states = {}
+# Admin တွေအတွက် အချိန် (မိနစ်) တောင်းနေတဲ့ state များကို မှတ်ထားရန်
+waiting_minutes = {}
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -54,14 +54,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     user_id = update.effective_user.id
 
-    # Admin က မိနစ်အရေအတွက် ရိုက်ထည့်နေချိန်
-    if user_id in user_states and user_states[user_id].get("waiting_for_minutes"):
-        check_id = user_states[user_id]["check_id"]
+    # 1. Admin က မိနစ်အရေအတွက် (ဥပမာ: 10) ရိုက်ထည့်လိုက်တဲ့အခါ
+    if user_id in waiting_minutes:
+        check_id = waiting_minutes[user_id]
         try:
             minutes = int(text)
             duration_ms = minutes * 60 * 1000
 
-            # Firebase တွင် အချိန်နှင့်တကွ ဖွင့်ပေးခြင်း
+            # Firebase သို့ အချိန်နှင့်တကွ ဖွင့်ပေးခြင်း
             ref = db.reference(f"users/{check_id}")
             ref.update(
                 {
@@ -72,7 +72,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 }
             )
 
-            del user_states[user_id]
+            # state ကို ရှင်းထုတ်မည်
+            del waiting_minutes[user_id]
+
             await update.message.reply_text(
                 f"✅ Check ID: <code>{check_id}</code> ကို **{minutes} မိနစ်** စာ အောင်မြင်စွာ ဖွင့်ပေးလိုက်ပါပြီ။",
                 parse_mode="HTML",
@@ -84,10 +86,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
 
-    # Check ID ပို့လာသည့်အခါ
+    # 2. Check ID (ဥပမာ - FLASH-XXXXX) ပို့လာသည့်အခါ
     if text.upper().startswith("FLASH"):
         check_id = text.upper()
-        user_states[user_id] = {"check_id": check_id}
         ref = db.reference(f"users/{check_id}")
         user_data = ref.get()
 
@@ -142,6 +143,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     data = query.data
     user_id = update.effective_user.id
+    chat_id = query.message.chat_id
 
     if data.startswith("mode_always_"):
         check_id = data.replace("mode_always_", "")
@@ -156,22 +158,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data.startswith("mode_timed_"):
         check_id = data.replace("mode_timed_", "")
-        if user_id in user_states:
-            user_states[user_id]["waiting_for_minutes"] = True
-        else:
-            user_states[user_id] = {
-                "check_id": check_id,
-                "waiting_for_minutes": True,
-            }
+        # ဒီ Admin အတွက် ဘယ် Check ID ကို အချိန်ပေးရမလဲ မှတ်ထားမည်
+        waiting_minutes[user_id] = check_id
+
         await query.edit_message_text(
-            text=f"⏳ Check ID: <code>{check_id}</code> အတွက် **ဘယ်နှစ်မိနစ်** သုံးခွင့်ပေးမလဲ? (ဥပမာ: 10 သို့မဟုတ် 15 လို့ ရိုက်ပြီး ပို့ပေးပါ)",
+            text=f"⏳ Check ID: <code>{check_id}</code> အတွက် **ဘယ်နှစ်မိနစ်** သုံးခွင့်ပေးမလဲ?\n\n(ဥပမာ: 10 သို့မဟုတ် 15 ဟု ဂဏန်းဖြင့် တိုက်ရိုက်ရိုက်ပြီး ပို့ပေးပါ)",
             parse_mode="HTML",
         )
 
     elif data.startswith("block_"):
         check_id = data.replace("block_", "")
         ref = db.reference(f"users/{check_id}")
-        # ပိတ်လိုက်လျှင် အချိန်နှင့် အချက်အလက်များ 0/False ဖြစ်သွားမည်
         ref.update(
             {"status": False, "mode": "blocked", "startTime": 0, "duration": 0}
         )
