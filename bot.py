@@ -70,8 +70,7 @@ def get_remaining_time_text(user_data):
 def send_welcome(message):
     bot.reply_to(
         message,
-        "⚡ *FLASH BETBOT Admin Bot* ⚡\n\nCheck ID (ဥပမာ - FLASH-795HY) ကို ပို့ပေးပါ။",
-        parse_mode="Markdown"
+        "⚡ FLASH BETBOT Admin Bot ⚡\n\nCheck ID (ဥပမာ - FLASH-795HY) ကို ပို့ပေးပါ။"
     )
 
 # Check ID ကို စာသားဖြင့် ပို့လာသောအခါ
@@ -97,8 +96,8 @@ def handle_message(message):
     status = user_data.get('status', False)
     time_str = get_remaining_time_text(user_data)
     
-    text = f"🔍 *Check ID:* `{check_id}`\n" \
-           f"👤 *Telegram Name:* {tg_name}\n" \
+    text = f"🔍 Check ID: {check_id}\n" \
+           f"👤 Telegram Name: {tg_name}\n" \
            f"လက်ရှိ အခြေအနေ: {'ဖွင့်ထားသည်' if status else 'ပိတ်ထားသည်'}\n" \
            f"ကျန်ရှိသောအချိန် : {time_str}\n\n" \
            f"ဘယ်လို ပုံစံမျိုး လုပ်ဆောင်မလဲ ရွေးချယ်ပါ -"
@@ -114,7 +113,7 @@ def handle_message(message):
     markup.add(InlineKeyboardButton("➕ ၁၀ မိနစ် ပေါင်းမည် (+10m)", callback_data=f"add10_{check_id}"))
     markup.add(InlineKeyboardButton("❌ အကောင့်ပိတ်မည် (Block)", callback_data=f"block_{check_id}"))
 
-    bot.reply_to(message, text, reply_markup=markup, parse_mode="Markdown")
+    bot.reply_to(message, text, reply_markup=markup)
 
 # ခလုတ်များကို နှိပ်လိုက်သောအခါ လုပ်ဆောင်ချက်
 @bot.callback_query_handler(func=lambda call: True)
@@ -140,13 +139,12 @@ def callback_query(call):
             'duration': 0
         })
         bot.edit_message_text(
-            f"🔍 *Check ID:* `{check_id}`\n"
-            f"👤 *Telegram Name:* {tg_name}\n"
+            f"🔍 Check ID: {check_id}\n"
+            f"👤 Telegram Name: {tg_name}\n"
             f"လက်ရှိ အခြေအနေ: ဖွင့်ထားသည်\n"
-            f"ကျန်ရှိသောအချိန် : *♾️ အမြဲတမ်း (Always)*",
+            f"ကျန်ရှိသောအချိန် : ♾️ အမြဲတမ်း (Always)",
             chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            parse_mode="Markdown"
+            message_id=call.message.message_id
         )
 
     elif action.startswith("timed"):
@@ -160,13 +158,12 @@ def callback_query(call):
             'duration': duration_ms
         })
         bot.edit_message_text(
-            f"🔍 *Check ID:* `{check_id}`\n"
-            f"👤 *Telegram Name:* {tg_name}\n"
+            f"🔍 Check ID: {check_id}\n"
+            f"👤 Telegram Name: {tg_name}\n"
             f"လက်ရှိ အခြေအနေ: ဖွင့်ထားသည်\n"
-            f"ကျန်ရှိသောအချိန် : *{mins} မိနစ်*",
+            f"ကျန်ရှိသောအချိန် : {mins} မိနစ်",
             chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            parse_mode="Markdown"
+            message_id=call.message.message_id
         )
 
     elif action.startswith("add"):
@@ -180,7 +177,6 @@ def callback_query(call):
             old_start = user_data.get('startTime', current_time)
             old_duration = user_data.get('duration', 0)
             
-            # လက်ရှိကျန်နေသေးသောအချိန်ကို တွက်မည် (သို့မဟုတ် အသစ်ပြန်စမည်)
             elapsed = current_time - old_start
             remaining = old_duration - elapsed
             if remaining < 0:
@@ -199,13 +195,12 @@ def callback_query(call):
         
         total_mins = int(new_duration / (1000 * 60))
         bot.edit_message_text(
-            f"🔍 *Check ID:* `{check_id}`\n"
-            f"👤 *Telegram Name:* {tg_name}\n"
+            f"🔍 Check ID: {check_id}\n"
+            f"👤 Telegram Name: {tg_name}\n"
             f"လက်ရှိ အခြေအနေ: ဖွင့်ထားသည်\n"
-            f"ကျန်ရှိသောအချိန် : *{total_mins} မိနစ် (+{add_mins} မိနစ် ပေါင်းပြီး)*",
+            f"ကျန်ရှိသောအချိန် : {total_mins} မိနစ် (+{add_mins} မိနစ် ပေါင်းပြီး)",
             chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            parse_mode="Markdown"
+            message_id=call.message.message_id
         )
 
     elif action == "block":
@@ -216,13 +211,12 @@ def callback_query(call):
             'duration': 0
         })
         bot.edit_message_text(
-            f"🔍 *Check ID:* `{check_id}`\n"
-            f"👤 *Telegram Name:* {tg_name}\n"
+            f"🔍 Check ID: {check_id}\n"
+            f"👤 Telegram Name: {tg_name}\n"
             f"လက်ရှိ အခြေအနေ: ပိတ်ထားသည်\n"
             f"❌ အကောင့်ပိတ်ပြီးပါပြီ။",
             chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            parse_mode="Markdown"
+            message_id=call.message.message_id
         )
 
 if __name__ == "__main__":
