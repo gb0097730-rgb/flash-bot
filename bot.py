@@ -1,9 +1,8 @@
 import os
+import requests
 from flask import Flask, request
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-import firebase_admin
-from firebase_admin import initialize_app, db
 
 # Bot Token
 TOKEN = "8746808077:AAHw3PnbPiy_f4gSdDMMrZg-mi2CvH0205o"
@@ -12,14 +11,8 @@ bot = telebot.TeleBot(TOKEN, threaded=False)
 # Flask App
 app = Flask(__name__)
 
-# Firebase Database ကို Credentials အရှုပ်အရှင်းမရှိဘဲ လုံခြုံစွာ ချိတ်ဆက်ခြင်း
-if not firebase_admin._apps:
-    try:
-        initialize_app(options={
-            'databaseURL': 'https://flash-1d21e-default-rtdb.europe-west1.firebasedatabase.app'
-        })
-    except Exception as e:
-        print("Firebase Init Error:", e)
+# Firebase Realtime Database URL
+FIREBASE_URL = "https://flash-1d21e-default-rtdb.europe-west1.firebasedatabase.app"
 
 # Telegram Webhook Endpoint
 @app.route(f'/{TOKEN}', methods=['POST'])
@@ -51,9 +44,9 @@ def handle_message(message):
     check_id = message.text.strip().upper()
     
     try:
-        # URL သီးသန့်ဖြင့် Database မှ အချက်အလက် တိုက်ရိုက်လှမ်းယူခြင်း
-        ref = db.reference(f'users/{check_id}', url='https://flash-1d21e-default-rtdb.europe-west1.firebasedatabase.app')
-        user_data = ref.get()
+        # Firebase REST API ဖြင့် credentials လုံးဝမလိုဘဲ တိုက်ရိုက်လှမ်းယူခြင်း
+        response = requests.get(f"{FIREBASE_URL}/users/{check_id}.json")
+        user_data = response.json()
     except Exception as e:
         bot.reply_to(message, f"⚠️ Firebase ချိတ်ဆက်မှု အမှား: {e}")
         return
@@ -61,7 +54,7 @@ def handle_message(message):
     if not user_data:
         bot.reply_to(
             message, 
-            f"❌ '{check_id}' ကို Firebase ၏ `users/{check_id}` နေရာတွင် ရှာမတွေ့ပါ။"
+            f"❌ '{check_id}' ကို Firebase ထဲတွင် ရှာမတွေ့ပါ။"
         )
         return
 
@@ -88,12 +81,16 @@ def callback_query(call):
     action = data_parts[0]
     check_id = data_parts[1]
 
-    ref = db.reference(f'users/{check_id}', url='https://flash-1d21e-default-rtdb.europe-west1.firebasedatabase.app')
-    user_data = ref.get()
+    try:
+        response = requests.get(f"{FIREBASE_URL}/users/{check_id}.json")
+        user_data = response.json()
+    except:
+        user_data = None
+    
     tg_name = user_data.get('tgName', '') if user_data else ''
 
     if action == "always":
-        ref.update({
+        requests.patch(f"{FIREBASE_URL}/users/{check_id}.json", json={
             'status': True,
             'mode': 'always',
             'startTime': 0,
@@ -110,7 +107,7 @@ def callback_query(call):
         duration_ms = 1 * 60 * 1000  # ၁ မိနစ်
         import time
         current_time = int(time.time() * 1000)
-        ref.update({
+        requests.patch(f"{FIREBASE_URL}/users/{check_id}.json", json={
             'status': True,
             'mode': 'timed',
             'startTime': current_time,
@@ -127,7 +124,7 @@ def callback_query(call):
         duration_ms = 10 * 60 * 1000  # ၁၀ မိနစ်
         import time
         current_time = int(time.time() * 1000)
-        ref.update({
+        requests.patch(f"{FIREBASE_URL}/users/{check_id}.json", json={
             'status': True,
             'mode': 'timed',
             'startTime': current_time,
@@ -141,7 +138,7 @@ def callback_query(call):
         )
 
     elif action == "block":
-        ref.update({
+        requests.patch(f"{FIREBASE_URL}/users/{check_id}.json", json={
             'status': False,
             'mode': 'blocked',
             'startTime': 0,
