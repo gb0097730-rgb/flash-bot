@@ -3,7 +3,7 @@ import time
 from flask import Flask
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ApplicationBuilder, CallbackQueryHandler, CommandHandler, MessageHandler, ContextTypes, filters
-from firebase_admin import credentials, initialize_app, db
+from firebase_admin import initialize_app, db
 
 # Flask App (Render ဆာဗာ အိပ်မသွားစေရန်)
 app = Flask(__name__)
@@ -12,11 +12,13 @@ app = Flask(__name__)
 def home():
     return "Flash Bot is Live and Active!"
 
-# Firebase ချိတ်ဆက်ခြင်း (သင့်ရဲ့ Database URL ကို ထည့်ပါ)
-# အကယ်၍ json ဖိုင်သုံးထားပါက credentials.Certificate('path_to_key.json') ကို သုံးပါ
-initialize_app({
-    'databaseURL': 'https://flash-1d21e-default-rtdb.europe-west1.firebasedatabase.app'
-})
+# Firebase Database ချိတ်ဆက်ခြင်း
+try:
+    initialize_app(options={
+        'databaseURL': 'https://flash-1d21e-default-rtdb.europe-west1.firebasedatabase.app'
+    })
+except ValueError:
+    pass # Already initialized
 
 # /start Command
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -114,7 +116,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Telegram Bot ကို Background တွင် Run ခြင်း
 def run_telegram_bot():
-    TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"  # သင့်ရဲ့ Telegram Bot Token ထည့်ရန်
+    TOKEN = "8909968169:AAHkOH3mrnJ-GQSIV0rzBnb9bpdS5AtaGpI"
     application = ApplicationBuilder().token(TOKEN).build()
     
     application.add_handler(CommandHandler("start", start))
