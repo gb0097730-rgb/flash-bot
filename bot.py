@@ -1,9 +1,12 @@
 import os
 import time
 from flask import Flask
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import ApplicationBuilder, CallbackQueryHandler, CommandHandler, MessageHandler, ContextTypes, filters
+import telebot
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from firebase_admin import initialize_app, db
+
+TOKEN = "8909968169:AAHkOH3mrnJ-GQSIV0rzBnb9bpdS5AtaGpI"
+bot = telebot.TeleBot(TOKEN)
 
 # Flask App (Render ဆာဗာ အိပ်မသွားစေရန်)
 app = Flask(__name__)
@@ -21,69 +24,71 @@ except ValueError:
     pass # Already initialized
 
 # /start Command
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "⚡ **FLASH BETBOT Admin Bot** ⚡\n\nCheck ID (ဥပမာ - FLASH-795HY) ကို ပို့ပေးပါ။",
+@bot.message_handler(commands=['start'])
+def send_welcome(message):
+    bot.reply_to(
+        message,
+        "⚡ *FLASH BETBOT Admin Bot* ⚡\n\nCheck ID (ဥပမာ - FLASH-795HY) ကို ပို့ပေးပါ။",
         parse_mode="Markdown"
     )
 
 # Check ID ကို စာသားဖြင့် ပို့လာသောအခါ
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    check_id = update.message.text.strip().upper()
-    context.user_data['active_check_id'] = check_id
-
+@bot.message_handler(func=lambda message: True)
+def handle_message(message):
+    check_id = message.text.strip().upper()
+    
+    # User ID ကို temp သိမ်းရန်
+    chat_id = message.chat.id
+    
     ref = db.reference(f'users/{check_id}')
     user_data = ref.get()
 
     if not user_data:
-        await update.message.reply_text(f"❌ '{check_id}' ဖြင့် မှတ်ပုံတင်ထားသော အချက်အလက် မရှိပါ။")
+        bot.reply_to(message, f"❌ '{check_id}' ဖြင့် မှတ်ပုံတင်ထားသော အချက်အလက် မရှိပါ။")
         return
 
     tg_name = user_data.get('tgName', 'အမည်မသိ')
     status = user_data.get('status', False)
-    mode = user_data.get('mode', 'none')
-
-    text = f"🔍 **Check ID:** `{check_id}`\n" \
-           f"👤 **Telegram Name:** {tg_name}\n" \
+    
+    text = f"🔍 *Check ID:* `{check_id}`\n" \
+           f"👤 *Telegram Name:* {tg_name}\n" \
            f"လက်ရှိ အခြေအနေ: {'ဖွင့်ထားသည်' if status else 'ပိတ်ထားသည်'}\n\n" \
            f"ဘယ်လို ပုံစံမျိုး ဖွင့်ပေးမလဲ ရွေးချယ်ပါ -"
 
-    keyboard = [
-        [InlineKeyboardButton("♾️ အမြဲတမ်း ဖွင့်မည် (Always)", callback_data="mode_always")],
-        [InlineKeyboardButton("⏱️ ၁ မိနစ် ဖွင့်မည် (Timed 1m)", callback_data="mode_timed_1m")],
-        [InlineKeyboardButton("⏱️ ၁၀ မိနစ် ဖွင့်မည် (Timed 10m)", callback_data="mode_timed_10m")],
-        [InlineKeyboardButton("❌ အကောင့်ပိတ်မည် (Block)", callback_data="mode_block")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton("♾️ အမြဲတမ်း ဖွင့်မည် (Always)", callback_data=f"always_{check_id}"))
+    markup.add(InlineKeyboardButton("⏱️ ၁ မိနစ် ဖွင့်မည် (Timed 1m)", callback_data=f"timed1_{check_id}"))
+    markup.add(InlineKeyboardButton("⏱️ ၁၀ မိနစ် ဖွင့်မည် (Timed 10m)", callback_data=f"timed10_{check_id}"))
+    markup.add(InlineKeyboardButton("❌ အကောင့်ပိတ်မည် (Block)", callback_data=f"block_{check_id}"))
 
-    await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
+    bot.reply_to(message, text, reply_markup=markup, parse_mode="Markdown")
 
 # ခလုတ်များကို နှိပ်လိုက်သောအခါ လုပ်ဆောင်ချက်
-async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    check_id = context.user_data.get('active_check_id')
-    if not check_id:
-        await query.edit_message_text("⚠️ သတိပေးချက် - ကျေးဇူးပြု၍ Check ID ကို အရင်ပြန်ပို့ပါ။")
-        return
+@bot.callback_query_handler(func=lambda call: True)
+def callback_query(call):
+    data_parts = call.data.split('_')
+    action = data_parts[0]
+    check_id = data_parts[1]
 
     ref = db.reference(f'users/{check_id}')
-    data = ref.get()
-    tg_name = data.get('tgName', '') if data else ''
+    user_data = ref.get()
+    tg_name = user_data.get('tgName', '') if user_data else ''
 
-    action = query.data
-
-    if action == "mode_always":
+    if action == "always":
         ref.update({
             'status': True,
             'mode': 'always',
             'startTime': 0,
             'duration': 0
         })
-        await query.edit_message_text(f"✅ Check ID: {check_id} ({tg_name}) ကို **အမြဲတမ်း (Always)** အောင်မြင်စွာ ဖွင့်ပေးလိုက်ပါပြီ။", parse_mode="Markdown")
+        bot.edit_message_text(
+            f"✅ Check ID: `{check_id}` ({tg_name}) ကို *အမြဲတမ်း (Always)* အောင်မြင်စွာ ဖွင့်ပေးလိုက်ပါပြီ။",
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            parse_mode="Markdown"
+        )
 
-    elif action == "mode_timed_1m":
+    elif action == "timed1":
         duration_ms = 1 * 60 * 1000  # ၁ မိနစ်
         current_time = int(time.time() * 1000)
         ref.update({
@@ -92,9 +97,14 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'startTime': current_time,
             'duration': duration_ms
         })
-        await query.edit_message_text(f"✅ Check ID: {check_id} ({tg_name}) ကို **၁ မိနစ်** စာ အောင်မြင်စွာ ဖွင့်ပေးလိုက်ပါပြီ။", parse_mode="Markdown")
+        bot.edit_message_text(
+            f"✅ Check ID: `{check_id}` ({tg_name}) ကို *၁ မိနစ်* စာ အောင်မြင်စွာ ဖွင့်ပေးလိုက်ပါပြီ။",
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            parse_mode="Markdown"
+        )
 
-    elif action == "mode_timed_10m":
+    elif action == "timed10":
         duration_ms = 10 * 60 * 1000  # ၁၀ မိနစ်
         current_time = int(time.time() * 1000)
         ref.update({
@@ -103,31 +113,33 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'startTime': current_time,
             'duration': duration_ms
         })
-        await query.edit_message_text(f"✅ Check ID: {check_id} ({tg_name}) ကို **၁၀ မိနစ်** စာ အောင်မြင်စွာ ဖွင့်ပေးလိုက်ပါပြီ။", parse_mode="Markdown")
+        bot.edit_message_text(
+            f"✅ Check ID: `{check_id}` ({tg_name}) ကို *၁၀ မိနစ်* စာ အောင်မြင်စွာ ဖွင့်ပေးလိုက်ပါပြီ။",
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            parse_mode="Markdown"
+        )
 
-    elif action == "mode_block":
+    elif action == "block":
         ref.update({
             'status': False,
             'mode': 'blocked',
             'startTime': 0,
             'duration': 0
         })
-        await query.edit_message_text(f"❌ Check ID: {check_id} ({tg_name}) ၏ ခွင့်ပြုချက်ကို ပိတ်လိုက်ပါပြီ။", parse_mode="Markdown")
+        bot.edit_message_text(
+            f"❌ Check ID: `{check_id}` ({tg_name}) ၏ ခွင့်ပြုချက်ကို ပိတ်လိုက်ပါပြီ။",
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            parse_mode="Markdown"
+        )
 
 # Telegram Bot ကို Background တွင် Run ခြင်း
 def run_telegram_bot():
-    TOKEN = "8909968169:AAHkOH3mrnJ-GQSIV0rzBnb9bpdS5AtaGpI"
-    application = ApplicationBuilder().token(TOKEN).build()
-    
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
-    application.add_handler(CallbackQueryHandler(button_callback))
-    
-    application.run_polling()
+    bot.infinity_polling()
 
 if __name__ == "__main__":
     import threading
-    # Telegram Bot ကို Thread တစ်ခုအနေဖြင့် စတင်မည်
     bot_thread = threading.Thread(target=run_telegram_bot)
     bot_thread.daemon = True
     bot_thread.start()
