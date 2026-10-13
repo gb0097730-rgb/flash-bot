@@ -3,7 +3,7 @@ import time
 from flask import Flask
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-from firebase_admin import initialize_app, db
+from firebase_admin import credentials, initialize_app, db
 
 TOKEN = "8909968169:AAHkOH3mrnJ-GQSIV0rzBnb9bpdS5AtaGpI"
 bot = telebot.TeleBot(TOKEN)
@@ -15,13 +15,21 @@ app = Flask(__name__)
 def home():
     return "Flash Bot is Live and Active!"
 
-# Firebase Database ချိတ်ဆက်ခြင်း
+# Firebase Database ချိတ်ဆက်ခြင်း (Credentials အမှန်တကယ် သုံးစွဲရန်)
+# အကယ်၍ serviceAccountKey.json ဖိုင်ကို Render တွင် တင်ထားလျှင်:
 try:
-    initialize_app(options={
+    cred = credentials.Certificate("serviceAccountKey.json")
+    initialize_app(cred, {
         'databaseURL': 'https://flash-1d21e-default-rtdb.europe-west1.firebasedatabase.app'
     })
-except ValueError:
-    pass # Already initialized
+except Exception:
+    # JSON ဖိုင် မရှိသေးပါက အခြားနည်းလမ်းဖြင့် ချိတ်ဆက်ရန်
+    try:
+        initialize_app(options={
+            'databaseURL': 'https://flash-1d21e-default-rtdb.europe-west1.firebasedatabase.app'
+        })
+    except ValueError:
+        pass
 
 # /start Command
 @bot.message_handler(commands=['start'])
@@ -36,9 +44,6 @@ def send_welcome(message):
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
     check_id = message.text.strip().upper()
-    
-    # User ID ကို temp သိမ်းရန်
-    chat_id = message.chat.id
     
     ref = db.reference(f'users/{check_id}')
     user_data = ref.get()
