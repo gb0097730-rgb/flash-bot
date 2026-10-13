@@ -30,11 +30,20 @@ def send_welcome(message):
 def handle_message(message):
     check_id = message.text.strip().upper()
     
-    ref = db.reference(f'users/{check_id}')
-    user_data = ref.get()
+    # Firebase တွင် ဒေတာရှာဖွေခြင်း (users အောက်တွင် ရှိမရှိ စစ်ဆေးမည်)
+    try:
+        ref = db.reference(f'users/{check_id}')
+        user_data = ref.get()
+    except Exception as e:
+        bot.reply_to(message, f"⚠️ Firebase ချိတ်ဆက်မှု အမှား: {e}")
+        return
 
     if not user_data:
-        bot.reply_to(message, f"❌ '{check_id}' ဖြင့် Firebase ထဲတွင် မှတ်ပုံတင်ထားသော အချက်အလက် မရှိပါ။")
+        bot.reply_to(
+            message, 
+            f"❌ '{check_id}' ကို Firebase ၏ `users/{check_id}` နေရာတွင် ရှာမတွေ့ပါ။\n\n"
+            "ကျေးဇူးပြု၍ Firebase Console ထဲတွင် data structure က `users` အောက်မှာ Check ID တွေ ရှိရဲ့လား သေချာစစ်ဆေးပေးပါ။"
+        )
         return
 
     tg_name = user_data.get('tgName', 'အမည်မသိ')
