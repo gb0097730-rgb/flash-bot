@@ -3,6 +3,7 @@ import time
 from flask import Flask
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+import firebase_admin
 from firebase_admin import credentials, initialize_app, db
 
 TOKEN = "8909968169:AAHkOH3mrnJ-GQSIV0rzBnb9bpdS5AtaGpI"
@@ -15,21 +16,14 @@ app = Flask(__name__)
 def home():
     return "Flash Bot is Live and Active!"
 
-# Firebase Database ချိတ်ဆက်ခြင်း (Credentials အမှန်တကယ် သုံးစွဲရန်)
-# အကယ်၍ serviceAccountKey.json ဖိုင်ကို Render တွင် တင်ထားလျှင်:
-try:
-    cred = credentials.Certificate("serviceAccountKey.json")
-    initialize_app(cred, {
-        'databaseURL': 'https://flash-1d21e-default-rtdb.europe-west1.firebasedatabase.app'
-    })
-except Exception:
-    # JSON ဖိုင် မရှိသေးပါက အခြားနည်းလမ်းဖြင့် ချိတ်ဆက်ရန်
+# Firebase Database ကို Credentials မလိုဘဲ URL သီးသန့်ဖြင့် လုံခြုံစွာ ချိတ်ဆက်ခြင်း
+if not firebase_admin._apps:
     try:
         initialize_app(options={
             'databaseURL': 'https://flash-1d21e-default-rtdb.europe-west1.firebasedatabase.app'
         })
-    except ValueError:
-        pass
+    except Exception as e:
+        print("Firebase Initialization Error:", e)
 
 # /start Command
 @bot.message_handler(commands=['start'])
@@ -49,7 +43,7 @@ def handle_message(message):
     user_data = ref.get()
 
     if not user_data:
-        bot.reply_to(message, f"❌ '{check_id}' ဖြင့် မှတ်ပုံတင်ထားသော အချက်အလက် မရှိပါ။")
+        bot.reply_to(message, f"❌ '{check_id}' ဖြင့် Firebase ထဲတွင် မှတ်ပုံတင်ထားသော အချက်အလက် မရှိပါ။ ကျေးဇူးပြု၍ ဝဘ်ဆိုက်တွင် Check ID အရင်ထုတ်ပါ။")
         return
 
     tg_name = user_data.get('tgName', 'အမည်မသိ')
