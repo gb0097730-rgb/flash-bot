@@ -30,6 +30,41 @@ def webhook():
 def home():
     return "Flash Bot Webhook is Active!"
 
+# ကျန်ရှိသောအချိန်ကို တွက်ချက်သည့် ဖန်ရှင်
+def get_remaining_time_text(user_data):
+    if not user_data:
+        return "အချက်အလက် မရှိပါ"
+    
+    status = user_data.get('status', False)
+    if not status:
+        return "ပိတ်ထားသည်"
+    
+    mode = user_data.get('mode', '')
+    if mode == 'always':
+        return "♾️ အမြဲတမ်း (Always)"
+    elif mode == 'blocked':
+        return "❌ ပိတ်ထားသည်"
+    elif mode == 'timed':
+        start_time = user_data.get('startTime', 0)
+        duration = user_data.get('duration', 0)
+        current_time = int(time.time() * 1000)
+        
+        elapsed_ms = current_time - start_time
+        remaining_ms = duration - elapsed_ms
+        
+        if remaining_ms <= 0:
+            return "⏰ အချိန်ကုန်ဆုံးသွားပါပြီ"
+        
+        remaining_mins = int(remaining_ms / (1000 * 60))
+        remaining_secs = int((remaining_ms % (1000 * 60)) / 1000)
+        
+        if remaining_mins > 0:
+            return f"⏳ {remaining_mins} မိနစ် {remaining_secs} စက္ကန့်"
+        else:
+            return f"⏳ {remaining_secs} စက္ကန့်"
+            
+    return "ဖွင့်ထားသည်"
+
 # /start Command
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -60,18 +95,23 @@ def handle_message(message):
 
     tg_name = user_data.get('tgName', 'အမည်မသိ')
     status = user_data.get('status', False)
+    time_str = get_remaining_time_text(user_data)
     
     text = f"🔍 *Check ID:* `{check_id}`\n" \
            f"👤 *Telegram Name:* {tg_name}\n" \
-           f"လက်ရှိ အခြေအနေ: {'ဖွင့်ထားသည်' if status else 'ပိတ်ထားသည်'}\n\n" \
-           f"ဘယ်လို ပုံစံမျိုး ဖွင့်ပေးမလဲ ရွေးချယ်ပါ -"
+           f"လက်ရှိ အခြေအနေ: {'ဖွင့်ထားသည်' if status else 'ပိတ်ထားသည်'}\n" \
+           f"ကျန်ရှိသောအချိန် : {time_str}\n\n" \
+           f"ဘယ်လို ပုံစံမျိုး လုပ်ဆောင်မလဲ ရွေးချယ်ပါ -"
 
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton("♾️ အမြဲတမ်း ဖွင့်မည် (Always)", callback_data=f"always_{check_id}"))
-    markup.add(InlineKeyboardButton("⏱️ ၁ မိနစ် (Timed 1m)", callback_data=f"timed1_{check_id}"))
-    markup.add(InlineKeyboardButton("⏱️ ၅ မိနစ် (Timed 5m)", callback_data=f"timed5_{check_id}"))
-    markup.add(InlineKeyboardButton("⏱️ ၁၀ မိနစ် (Timed 10m)", callback_data=f"timed10_{check_id}"))
-    markup.add(InlineKeyboardButton("⏱️ မိနစ် ၃၀ (Timed 30m)", callback_data=f"timed30_{check_id}"))
+    markup.add(InlineKeyboardButton("⏱️ ၁ မိနစ် သတ်မှတ်မည် (Timed 1m)", callback_data=f"timed1_{check_id}"))
+    markup.add(InlineKeyboardButton("⏱️ ၅ မိနစ် သတ်မှတ်မည် (Timed 5m)", callback_data=f"timed5_{check_id}"))
+    markup.add(InlineKeyboardButton("⏱️ ၁၀ မိနစ် သတ်မှတ်မည် (Timed 10m)", callback_data=f"timed10_{check_id}"))
+    markup.add(InlineKeyboardButton("⏱️ မိနစ် ၃၀ သတ်မှတ်မည် (Timed 30m)", callback_data=f"timed30_{check_id}"))
+    # အချိန်ပေါင်းထည့်ရန် ခလုတ်များ
+    markup.add(InlineKeyboardButton("➕ ၅ မိနစ် ပေါင်းမည် (+5m)", callback_data=f"add5_{check_id}"))
+    markup.add(InlineKeyboardButton("➕ ၁၀ မိနစ် ပေါင်းမည် (+10m)", callback_data=f"add10_{check_id}"))
     markup.add(InlineKeyboardButton("❌ အကောင့်ပိတ်မည် (Block)", callback_data=f"block_{check_id}"))
 
     bot.reply_to(message, text, reply_markup=markup, parse_mode="Markdown")
@@ -103,7 +143,7 @@ def callback_query(call):
             f"🔍 *Check ID:* `{check_id}`\n"
             f"👤 *Telegram Name:* {tg_name}\n"
             f"လက်ရှိ အခြေအနေ: ဖွင့်ထားသည်\n"
-            f"ကျန်ရှိသောအချိန် : *အမြဲတမ်း (Always)*",
+            f"ကျန်ရှိသောအချိန် : *♾️ အမြဲတမ်း (Always)*",
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             parse_mode="Markdown"
@@ -124,6 +164,45 @@ def callback_query(call):
             f"👤 *Telegram Name:* {tg_name}\n"
             f"လက်ရှိ အခြေအနေ: ဖွင့်ထားသည်\n"
             f"ကျန်ရှိသောအချိန် : *{mins} မိနစ်*",
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            parse_mode="Markdown"
+        )
+
+    elif action.startswith("add"):
+        add_mins = int(action.replace("add", ""))
+        add_ms = add_mins * 60 * 1000
+        
+        old_status = user_data.get('status', False) if user_data else False
+        old_mode = user_data.get('mode', '') if user_data else ''
+        
+        if old_status and old_mode == 'timed':
+            old_start = user_data.get('startTime', current_time)
+            old_duration = user_data.get('duration', 0)
+            
+            # လက်ရှိကျန်နေသေးသောအချိန်ကို တွက်မည် (သို့မဟုတ် အသစ်ပြန်စမည်)
+            elapsed = current_time - old_start
+            remaining = old_duration - elapsed
+            if remaining < 0:
+                remaining = 0
+                
+            new_duration = remaining + add_ms
+        else:
+            new_duration = add_ms
+            
+        requests.patch(f"{FIREBASE_URL}/users/{check_id}.json", json={
+            'status': True,
+            'mode': 'timed',
+            'startTime': current_time,
+            'duration': new_duration
+        })
+        
+        total_mins = int(new_duration / (1000 * 60))
+        bot.edit_message_text(
+            f"🔍 *Check ID:* `{check_id}`\n"
+            f"👤 *Telegram Name:* {tg_name}\n"
+            f"လက်ရှိ အခြေအနေ: ဖွင့်ထားသည်\n"
+            f"ကျန်ရှိသောအချိန် : *{total_mins} မိနစ် (+{add_mins} မိနစ် ပေါင်းပြီး)*",
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             parse_mode="Markdown"
