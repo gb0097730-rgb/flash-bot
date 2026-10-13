@@ -4,7 +4,8 @@ import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from firebase_admin import initialize_app, db
 
-TOKEN = "8909968169:AAHkOH3mrnJ-GQSIV0rzBnb9bpdS5AtaGpI"
+# Bot Token အသစ်
+TOKEN = "8746808077:AAHw3PnbPiy_f4gSdDMMrZg-mi2CvH0205o"
 bot = telebot.TeleBot(TOKEN)
 
 # Firebase Database ချိတ်ဆက်ခြင်း
@@ -125,4 +126,4 @@ def callback_query(call):
 
 if __name__ == "__main__":
     print("Bot is starting...")
-    bot.infinity_polling(skip_pending=True)
+    bot.infinity_polling(skip_pending=True, remove_webhook=True)
