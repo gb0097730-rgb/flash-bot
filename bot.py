@@ -86,7 +86,7 @@ def show_user_panel(chat_id, message_id, check_id):
     status = user_data.get('status', False)
     time_str = get_remaining_time_text(user_data)
     
-    text = f"🔍 Check ID: `{check_id}`\n" \
+    text = f"🔍 Check ID: {check_id}\n" \
            f"👤 Telegram Name: {tg_name}\n" \
            f"လက်ရှိ အခြေအနေ: {'ဖွင့်ထားသည်' if status else 'ပိတ်ထားသည်'}\n" \
            f"ကျန်ရှိသောအချိန် : {time_str}\n\n" \
@@ -113,13 +113,13 @@ def show_user_panel(chat_id, message_id, check_id):
 
     if message_id:
         try:
-            bot.edit_message_text(text, chat_id=chat_id, message_id=message_id, reply_markup=markup, parse_mode="Markdown")
+            bot.edit_message_text(text, chat_id=chat_id, message_id=message_id, reply_markup=markup)
             return
         except:
             pass
-    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
+    bot.send_message(chat_id, text, reply_markup=markup)
 
-# လူစာရင်းကို ပြသပေးသည့် အထွေထွေ function (ဖျက်ရန် ခလုတ်အပါအဝင်)
+# လူစာရင်းကို ပြသပေးသည့် အထွေထွေ function
 def send_users_list_view(chat_id, message_id=None):
     try:
         response = requests.get(f"{FIREBASE_URL}/users.json")
@@ -137,25 +137,24 @@ def send_users_list_view(chat_id, message_id=None):
                 icon = "🟢" if status else "🔴"
                 markup.add(InlineKeyboardButton(f"{icon} {tg_name} ({check_id})", callback_data=f"selectuser_{check_id}"))
         
-        # 🗑️ စာရင်းအားလုံးကို တစ်ခါတည်း အကုန်ဖျက်မည့် ခလုတ်
         markup.add(InlineKeyboardButton("🗑️ စာရင်းအားလုံး လုံးဝဖျက်မည် (Delete All)", callback_data="delete_all_users"))
 
     markup.add(InlineKeyboardButton("🔄 စာရင်းကိုင် Refresh လုပ်ရန်", callback_data="refresh_list"))
 
-    text = "⚡ FLASH BETBOT Admin Bot ⚡\n\n📋 **ခွင့်ပြုချက်ပေးထားသော / စာရင်းသွင်းထားသော လူစာရင်းများ:**\nအောက်ပါစာရင်းမှ လူတစ်ဦးချင်းစီကို နှိပ်၍ အချိန်သတ်မှတ်နိုင်ပါသည် -"
+    text = "⚡ FLASH BETBOT Admin Bot ⚡\n\n📋 ခွင့်ပြုချက်ပေးထားသော / စာရင်းသွင်းထားသော လူစာရင်းများ:\nအောက်ပါစာရင်းမှ လူတစ်ဦးချင်းစီကို နှိပ်၍ အချိန်သတ်မှတ်နိုင်ပါသည် -"
 
     if not users_dict:
         text = "⚡ FLASH BETBOT Admin Bot ⚡\n\n📭 လက်ရှိ စာရင်းသွင်းထားသော လူစာရင်း မရှိသေးပါ။"
 
     if message_id:
         try:
-            bot.edit_message_text(text, chat_id=chat_id, message_id=message_id, reply_markup=markup, parse_mode="Markdown")
+            bot.edit_message_text(text, chat_id=chat_id, message_id=message_id, reply_markup=markup)
             return
         except:
             pass
-    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
+    bot.send_message(chat_id, text, reply_markup=markup)
 
-# /start Command (သို့မဟုတ် မီနူးခေါ်ရန်)
+# /start Command
 @bot.message_handler(commands=['start', 'users', 'list'])
 def send_welcome(message):
     send_users_list_view(message.chat.id)
@@ -177,7 +176,6 @@ def callback_query(call):
         send_users_list_view(chat_id, message_id)
         return
 
-    # 🗑️ စာရင်းအားလုံးကို တစ်ခါတည်း အကုန်ဖြတ်မည့် ခလုတ်နှိပ်လျှင်
     if data == "delete_all_users":
         requests.delete(f"{FIREBASE_URL}/users.json")
         bot.answer_callback_query(call.id, text="🗑️ စာရင်းအားလုံးကို အကုန်ဖျက်ပစ်လိုက်ပါပြီ။")
