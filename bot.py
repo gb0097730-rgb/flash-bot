@@ -100,14 +100,16 @@ def callback_query(call):
             'duration': 0
         })
         bot.edit_message_text(
-            f"✅ Check ID: `{check_id}` ({tg_name}) ကို *အမြဲတမ်း (Always)* အောင်မြင်စွာ ဖွင့်ပေးလိုက်ပါပြီ။",
+            f"🔍 *Check ID:* `{check_id}`\n"
+            f"👤 *Telegram Name:* {tg_name}\n"
+            f"လက်ရှိ အခြေအနေ: ဖွင့်ထားသည်\n"
+            f"ကျန်ရှိသောအချိန် : *အမြဲတမ်း (Always)*",
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             parse_mode="Markdown"
         )
 
     elif action.startswith("timed"):
-        # မိနစ်ပမာဏကို ဖြတ်ထုတ်ယူခြင်း (ဥပမာ timed5 ဆိုလျှင် 5 ကိုယူမည်)
         mins = int(action.replace("timed", ""))
         duration_ms = mins * 60 * 1000
         
@@ -118,7 +120,10 @@ def callback_query(call):
             'duration': duration_ms
         })
         bot.edit_message_text(
-            f"✅ Check ID: `{check_id}` ({tg_name}) ကို *{mins} မိနစ်* စာ အောင်မြင်စွာ ဖွင့်ပေးလိုက်ပါပြီ။",
+            f"🔍 *Check ID:* `{check_id}`\n"
+            f"👤 *Telegram Name:* {tg_name}\n"
+            f"လက်ရှိ အခြေအနေ: ဖွင့်ထားသည်\n"
+            f"ကျန်ရှိသောအချိန် : *{mins} မိနစ်*",
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             parse_mode="Markdown"
@@ -132,7 +137,10 @@ def callback_query(call):
             'duration': 0
         })
         bot.edit_message_text(
-            f"❌ Check ID: `{check_id}` ({tg_name}) ၏ ခွင့်ပြုချက်ကို ပိတ်လိုက်ပါပြီ။",
+            f"🔍 *Check ID:* `{check_id}`\n"
+            f"👤 *Telegram Name:* {tg_name}\n"
+            f"လက်ရှိ အခြေအနေ: ပိတ်ထားသည်\n"
+            f"❌ အကောင့်ပိတ်ပြီးပါပြီ။",
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             parse_mode="Markdown"
