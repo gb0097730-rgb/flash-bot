@@ -5,14 +5,14 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import firebase_admin
 from firebase_admin import initialize_app, db
 
-# Bot Token အသစ်
+# Bot Token
 TOKEN = "8746808077:AAHw3PnbPiy_f4gSdDMMrZg-mi2CvH0205o"
 bot = telebot.TeleBot(TOKEN, threaded=False)
 
 # Flask App
 app = Flask(__name__)
 
-# Firebase Database ချိတ်ဆက်ခြင်း
+# Firebase Database ကို Credentials အရှုပ်အရှင်းမရှိဘဲ လုံခြုံစွာ ချိတ်ဆက်ခြင်း
 if not firebase_admin._apps:
     try:
         initialize_app(options={
@@ -51,7 +51,8 @@ def handle_message(message):
     check_id = message.text.strip().upper()
     
     try:
-        ref = db.reference(f'users/{check_id}')
+        # URL သီးသန့်ဖြင့် Database မှ အချက်အလက် တိုက်ရိုက်လှမ်းယူခြင်း
+        ref = db.reference(f'users/{check_id}', url='https://flash-1d21e-default-rtdb.europe-west1.firebasedatabase.app')
         user_data = ref.get()
     except Exception as e:
         bot.reply_to(message, f"⚠️ Firebase ချိတ်ဆက်မှု အမှား: {e}")
@@ -87,7 +88,7 @@ def callback_query(call):
     action = data_parts[0]
     check_id = data_parts[1]
 
-    ref = db.reference(f'users/{check_id}')
+    ref = db.reference(f'users/{check_id}', url='https://flash-1d21e-default-rtdb.europe-west1.firebasedatabase.app')
     user_data = ref.get()
     tg_name = user_data.get('tgName', '') if user_data else ''
 
@@ -107,6 +108,7 @@ def callback_query(call):
 
     elif action == "timed1":
         duration_ms = 1 * 60 * 1000  # ၁ မိနစ်
+        import time
         current_time = int(time.time() * 1000)
         ref.update({
             'status': True,
@@ -123,6 +125,7 @@ def callback_query(call):
 
     elif action == "timed10":
         duration_ms = 10 * 60 * 1000  # ၁၀ မိနစ်
+        import time
         current_time = int(time.time() * 1000)
         ref.update({
             'status': True,
@@ -152,7 +155,6 @@ def callback_query(call):
         )
 
 if __name__ == "__main__":
-    # Webhook ကို Render URL ဖြင့် ချိတ်ဆက်ခြင်း
     RENDER_URL = os.environ.get("RENDER_EXTERNAL_URL")
     if RENDER_URL:
         bot.remove_webhook()
