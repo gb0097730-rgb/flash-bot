@@ -1,9 +1,23 @@
+import os
 import time
-from firebase_admin import db
+from flask import Flask
+from firebase_admin import credentials, initialize_app, db
 
-# Admin က /check <CheckID> (သို့မဟုတ် ခလုတ်နှိပ်စစ်ဆေးချိန်) လုပ်တဲ့အခါ
+# Flask App တည်ဆောက်ခြင်း (Render Sleep မဖြစ်စေရန်အတွက်)
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Flash Bot is Active!"
+
+# Firebase ချိတ်ဆက်ခြင်း (သင့်ရဲ့ Firebase JSON ဖိုင်အမည်ကို ထည့်ပါ)
+# cred = credentials.Certificate("firebase_key.json")
+# initialize_app(cred, {
+#     'databaseURL': 'https://flash-1d21e-default-rtdb.europe-west1.firebasedatabase.app'
+# })
+
+# Telegram Bot စတင် Run ခြင်းနှင့် Admin မှ Check ID စစ်ဆေးရန် Function
 def check_user_status(message, check_id):
-    # Firebase မှ User အချက်အလက်များကို ယူမည်
     ref = db.reference(f'users/{check_id}')
     user_data = ref.get()
     
@@ -11,7 +25,6 @@ def check_user_status(message, check_id):
         message.reply_text(f"❌ '{check_id}' ဖြင့် မှတ်ပုံတင်ထားသော အချက်အလက် မတွေ့ရှိပါ။")
         return
 
-    # အချက်အလက်များ ထုတ်ယူခြင်း
     tg_name = user_data.get('tgName', 'အမည်မသိ')
     status = user_data.get('status', False)
     mode = user_data.get('mode', 'none')
@@ -21,11 +34,10 @@ def check_user_status(message, check_id):
                     f"🟢 **Status:** {'Active (ဖွင့်ထားသည်)' if status else 'Inactive (ပိတ်ထားသည်)'}\n" \
                     f"⚙️ **Mode:** {mode.upper()}\n"
 
-    # အကယ်၍ Timed Mode ဖြစ်ပြီး အလုပ်လုပ်နေပါက ကျန်ရှိသောအချိန်ကို တွက်ချက်မည်
     if status and mode == 'timed':
         start_time = user_data.get('startTime', 0)
         duration = user_data.get('duration', 0)
-        current_time = int(time.time() * 1000) # Milliseconds
+        current_time = int(time.time() * 1000)
         
         elapsed = current_time - start_time
         time_left = duration - elapsed
@@ -41,6 +53,11 @@ def check_user_status(message, check_id):
     elif status and mode == 'always':
         response_text += f"♾️ **အမျိုးအစား:** ၂၄ နာရီ အမြဲတမ်း ဖွင့်ထားသည် (Always Active)"
     else:
-        response_text += f"⚠️ **အခြေအနေ:** ခွင့်ပြုချက် မရှိသေးပါ (သို့မဟုတ် သက်တမ်းကုန်ဆုံး)"
+        response_text += f"⚠️ **အခြေအနေ:** ခွင့်ပြုချက် မရှိသေးပါ"
 
     message.reply_text(response_text, parse_mode="Markdown")
+
+# Render မှပေးသော Port ဖြင့် Flask Server ကို စတင် Run ခြင်း
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
