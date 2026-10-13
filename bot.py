@@ -1,24 +1,18 @@
 import os
-import time
-import threading
-from flask import Flask
+from flask import Flask, request
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import firebase_admin
-from firebase_admin import credentials, initialize_app, db
+from firebase_admin import initialize_app, db
 
 # Bot Token အသစ်
 TOKEN = "8746808077:AAHw3PnbPiy_f4gSdDMMrZg-mi2CvH0205o"
-bot = telebot.TeleBot(TOKEN)
+bot = telebot.TeleBot(TOKEN, threaded=False)
 
-# Flask App (Render ဆာဗာ Port ပွင့်နေစေရန်)
+# Flask App
 app = Flask(__name__)
 
-@app.route('/')
-def home():
-    return "Flash Bot is Live and Active!"
-
-# Firebase Database ကို Credentials အမှားမပါဘဲ URL သီးသန့်ဖြင့် ချိတ်ဆက်ခြင်း
+# Firebase Database ချိတ်ဆက်ခြင်း
 if not firebase_admin._apps:
     try:
         initialize_app(options={
@@ -26,6 +20,21 @@ if not firebase_admin._apps:
         })
     except Exception as e:
         print("Firebase Init Error:", e)
+
+# Telegram Webhook Endpoint
+@app.route(f'/{TOKEN}', methods=['POST'])
+def webhook():
+    if request.headers.get('content-type') == 'application/json':
+        json_string = request.get_data().decode('utf-8')
+        update = telebot.types.Update.de_json(json_string)
+        bot.process_new_updates([update])
+        return "!", 200
+    else:
+        return "Internal Server Error", 403
+
+@app.route('/')
+def home():
+    return "Flash Bot Webhook is Active!"
 
 # /start Command
 @bot.message_handler(commands=['start'])
@@ -142,17 +151,13 @@ def callback_query(call):
             parse_mode="Markdown"
         )
 
-# Telegram Bot ကို Background တွင် Run ခြင်း
-def run_telegram_bot():
-    print("Telegram Bot is starting...")
-    bot.infinity_polling(skip_pending=True)
-
 if __name__ == "__main__":
-    # Bot ကို Thread ဖြင့် စတင်မည်
-    bot_thread = threading.Thread(target=run_telegram_bot)
-    bot_thread.daemon = True
-    bot_thread.start()
+    # Webhook ကို Render URL ဖြင့် ချိတ်ဆက်ခြင်း
+    RENDER_URL = os.environ.get("RENDER_EXTERNAL_URL")
+    if RENDER_URL:
+        bot.remove_webhook()
+        bot.set_webhook(url=f"{RENDER_URL}/{TOKEN}")
+        print(f"Webhook set to: {RENDER_URL}/{TOKEN}")
 
-    # Flask Web Server ကို Render Port ဖြင့် စတင်မည်
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
