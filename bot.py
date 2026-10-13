@@ -76,7 +76,6 @@ def show_user_panel(chat_id, message_id, check_id):
         user_data = None
 
     if not user_data:
-        # ရှာမတွေ့တော့ရင် စာရင်းဆီကို ပြန်ပို့မယ် သို့မဟုတ် မတွေ့ကြောင်းပြမယ်
         try:
             bot.edit_message_text(f"❌ '{check_id}' ကို ဖျက်ပြီးပါပြီ သို့မဟုတ် ရှာမတွေ့ပါ။", chat_id=chat_id, message_id=message_id)
         except:
@@ -109,8 +108,7 @@ def show_user_panel(chat_id, message_id, check_id):
         InlineKeyboardButton("➕ 10m ပေါင်း", callback_data=f"add10_{check_id}")
     )
     markup.add(InlineKeyboardButton("❌ အကောင့်ပိတ်မည် (Block)", callback_data=f"block_{check_id}"))
-    # 🗑️ မလိုတော့သော Check ID ကို လုံးဝဖျက်ပစ်မည့် ခလုတ်
-    markup.add(InlineKeyboardButton("🗑️ စာရင်းထဲမှ လုံးဝဖျက်မည် (Delete)", callback_data=f"delete_{check_id}"))
+    markup.add(InlineKeyboardButton("🗑️ ဤ Check ID ကို ဖျက်မည်", callback_data=f"delete_{check_id}"))
     markup.add(InlineKeyboardButton("🔙 လူစာရင်းသို့ ပြန်သွားရန်", callback_data="back_to_list"))
 
     if message_id:
@@ -121,7 +119,7 @@ def show_user_panel(chat_id, message_id, check_id):
             pass
     bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
 
-# လူစာရင်းကို ပြသပေးသည့် အထွေထွေ function
+# လူစာရင်းကို ပြသပေးသည့် အထွေထွေ function (ဖျက်ရန် ခလုတ်အပါအဝင်)
 def send_users_list_view(chat_id, message_id=None):
     try:
         response = requests.get(f"{FIREBASE_URL}/users.json")
@@ -129,30 +127,25 @@ def send_users_list_view(chat_id, message_id=None):
     except:
         users_dict = None
 
-    if not users_dict:
-        text = "⚡ FLASH BETBOT Admin Bot ⚡\n\n📭 လက်ရှိ စာရင်းသွင်းထားသော လူစာရင်း မရှိသေးပါ။"
-        markup = InlineKeyboardMarkup()
-        markup.add(InlineKeyboardButton("🔄 Refresh", callback_data="refresh_list"))
-        if message_id:
-            try:
-                bot.edit_message_text(text, chat_id=chat_id, message_id=message_id, reply_markup=markup)
-                return
-            except:
-                pass
-        bot.send_message(chat_id, text, reply_markup=markup)
-        return
-
     markup = InlineKeyboardMarkup()
-    for check_id, data in users_dict.items():
-        if isinstance(data, dict):
-            tg_name = data.get('tgName', check_id)
-            status = data.get('status', False)
-            icon = "🟢" if status else "🔴"
-            markup.add(InlineKeyboardButton(f"{icon} {tg_name} ({check_id})", callback_data=f"selectuser_{check_id}"))
+    
+    if users_dict:
+        for check_id, data in users_dict.items():
+            if isinstance(data, dict):
+                tg_name = data.get('tgName', check_id)
+                status = data.get('status', False)
+                icon = "🟢" if status else "🔴"
+                markup.add(InlineKeyboardButton(f"{icon} {tg_name} ({check_id})", callback_data=f"selectuser_{check_id}"))
+        
+        # 🗑️ စာရင်းအားလုံးကို တစ်ခါတည်း အကုန်ဖျက်မည့် ခလုတ်
+        markup.add(InlineKeyboardButton("🗑️ စာရင်းအားလုံး လုံးဝဖျက်မည် (Delete All)", callback_data="delete_all_users"))
 
     markup.add(InlineKeyboardButton("🔄 စာရင်းကိုင် Refresh လုပ်ရန်", callback_data="refresh_list"))
 
     text = "⚡ FLASH BETBOT Admin Bot ⚡\n\n📋 **ခွင့်ပြုချက်ပေးထားသော / စာရင်းသွင်းထားသော လူစာရင်းများ:**\nအောက်ပါစာရင်းမှ လူတစ်ဦးချင်းစီကို နှိပ်၍ အချိန်သတ်မှတ်နိုင်ပါသည် -"
+
+    if not users_dict:
+        text = "⚡ FLASH BETBOT Admin Bot ⚡\n\n📭 လက်ရှိ စာရင်းသွင်းထားသော လူစာရင်း မရှိသေးပါ။"
 
     if message_id:
         try:
@@ -184,6 +177,13 @@ def callback_query(call):
         send_users_list_view(chat_id, message_id)
         return
 
+    # 🗑️ စာရင်းအားလုံးကို တစ်ခါတည်း အကုန်ဖြတ်မည့် ခလုတ်နှိပ်လျှင်
+    if data == "delete_all_users":
+        requests.delete(f"{FIREBASE_URL}/users.json")
+        bot.answer_callback_query(call.id, text="🗑️ စာရင်းအားလုံးကို အကုန်ဖျက်ပစ်လိုက်ပါပြီ။")
+        send_users_list_view(chat_id, message_id)
+        return
+
     if data.startswith("selectuser_"):
         check_id = data.replace("selectuser_", "")
         show_user_panel(chat_id, message_id, check_id)
@@ -196,7 +196,6 @@ def callback_query(call):
     action = data_parts[0]
     check_id = data_parts[1]
 
-    # 🗑️ လုံးဝ ဖျက်ပစ်မည့် လုပ်ဆောင်ချက်
     if action == "delete":
         requests.delete(f"{FIREBASE_URL}/users/{check_id}.json")
         bot.answer_callback_query(call.id, text=f"🗑️ {check_id} ကို စာရင်းထဲမှ ဖျက်ပစ်လိုက်ပါပြီ။")
