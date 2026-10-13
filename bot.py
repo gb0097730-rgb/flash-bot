@@ -126,4 +126,4 @@ def callback_query(call):
 
 if __name__ == "__main__":
     print("Bot is starting...")
-    bot.infinity_polling(skip_pending=True, remove_webhook=True)
+    bot.infinity_polling(skip_pending=True)
