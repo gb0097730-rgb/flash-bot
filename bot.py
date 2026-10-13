@@ -4,7 +4,8 @@ import threading
 from flask import Flask
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-from firebase_admin import initialize_app, db
+import firebase_admin
+from firebase_admin import credentials, initialize_app, db
 
 # Bot Token အသစ်
 TOKEN = "8746808077:AAHw3PnbPiy_f4gSdDMMrZg-mi2CvH0205o"
@@ -17,13 +18,14 @@ app = Flask(__name__)
 def home():
     return "Flash Bot is Live and Active!"
 
-# Firebase Database ချိတ်ဆက်ခြင်း
-try:
-    initialize_app(options={
-        'databaseURL': 'https://flash-1d21e-default-rtdb.europe-west1.firebasedatabase.app'
-    })
-except ValueError:
-    pass
+# Firebase Database ကို Credentials အမှားမပါဘဲ URL သီးသန့်ဖြင့် ချိတ်ဆက်ခြင်း
+if not firebase_admin._apps:
+    try:
+        initialize_app(options={
+            'databaseURL': 'https://flash-1d21e-default-rtdb.europe-west1.firebasedatabase.app'
+        })
+    except Exception as e:
+        print("Firebase Init Error:", e)
 
 # /start Command
 @bot.message_handler(commands=['start'])
@@ -151,6 +153,6 @@ if __name__ == "__main__":
     bot_thread.daemon = True
     bot_thread.start()
 
-    # Flask Web Server ကို Render Port ဖြင့် စတင်မည် (Port Error မတက်စေရန်)
+    # Flask Web Server ကို Render Port ဖြင့် စတင်မည်
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
