@@ -1,29 +1,19 @@
 import os
 import time
-from flask import Flask
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-import firebase_admin
-from firebase_admin import credentials, initialize_app, db
+from firebase_admin import initialize_app, db
 
 TOKEN = "8909968169:AAHkOH3mrnJ-GQSIV0rzBnb9bpdS5AtaGpI"
 bot = telebot.TeleBot(TOKEN)
 
-# Flask App (Render ဆာဗာ အိပ်မသွားစေရန်)
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return "Flash Bot is Live and Active!"
-
-# Firebase Database ကို Credentials မလိုဘဲ URL သီးသန့်ဖြင့် လုံခြုံစွာ ချိတ်ဆက်ခြင်း
-if not firebase_admin._apps:
-    try:
-        initialize_app(options={
-            'databaseURL': 'https://flash-1d21e-default-rtdb.europe-west1.firebasedatabase.app'
-        })
-    except Exception as e:
-        print("Firebase Initialization Error:", e)
+# Firebase Database ချိတ်ဆက်ခြင်း
+try:
+    initialize_app(options={
+        'databaseURL': 'https://flash-1d21e-default-rtdb.europe-west1.firebasedatabase.app'
+    })
+except ValueError:
+    pass
 
 # /start Command
 @bot.message_handler(commands=['start'])
@@ -43,7 +33,7 @@ def handle_message(message):
     user_data = ref.get()
 
     if not user_data:
-        bot.reply_to(message, f"❌ '{check_id}' ဖြင့် Firebase ထဲတွင် မှတ်ပုံတင်ထားသော အချက်အလက် မရှိပါ။ ကျေးဇူးပြု၍ ဝဘ်ဆိုက်တွင် Check ID အရင်ထုတ်ပါ။")
+        bot.reply_to(message, f"❌ '{check_id}' ဖြင့် Firebase ထဲတွင် မှတ်ပုံတင်ထားသော အချက်အလက် မရှိပါ။")
         return
 
     tg_name = user_data.get('tgName', 'အမည်မသိ')
@@ -133,16 +123,6 @@ def callback_query(call):
             parse_mode="Markdown"
         )
 
-# Telegram Bot ကို Background တွင် Run ခြင်း
-def run_telegram_bot():
-    bot.infinity_polling()
-
 if __name__ == "__main__":
-    import threading
-    bot_thread = threading.Thread(target=run_telegram_bot)
-    bot_thread.daemon = True
-    bot_thread.start()
-
-    # Flask Web Server ကို Render Port ဖြင့် စတင်မည်
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    print("Bot is starting...")
+    bot.infinity_polling(skip_pending=True)
