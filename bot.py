@@ -76,7 +76,11 @@ def show_user_panel(chat_id, message_id, check_id):
         user_data = None
 
     if not user_data:
-        bot.send_message(chat_id, f"❌ '{check_id}' ကို ရှာမတွေ့တော့ပါ။")
+        # ရှာမတွေ့တော့ရင် စာရင်းဆီကို ပြန်ပို့မယ် သို့မဟုတ် မတွေ့ကြောင်းပြမယ်
+        try:
+            bot.edit_message_text(f"❌ '{check_id}' ကို ဖျက်ပြီးပါပြီ သို့မဟုတ် ရှာမတွေ့ပါ။", chat_id=chat_id, message_id=message_id)
+        except:
+            bot.send_message(chat_id, f"❌ '{check_id}' ကို ရှာမတွေ့ပါ။")
         return
 
     tg_name = user_data.get('tgName', 'အမည်မသိ')
@@ -105,7 +109,50 @@ def show_user_panel(chat_id, message_id, check_id):
         InlineKeyboardButton("➕ 10m ပေါင်း", callback_data=f"add10_{check_id}")
     )
     markup.add(InlineKeyboardButton("❌ အကောင့်ပိတ်မည် (Block)", callback_data=f"block_{check_id}"))
+    # 🗑️ မလိုတော့သော Check ID ကို လုံးဝဖျက်ပစ်မည့် ခလုတ်
+    markup.add(InlineKeyboardButton("🗑️ စာရင်းထဲမှ လုံးဝဖျက်မည် (Delete)", callback_data=f"delete_{check_id}"))
     markup.add(InlineKeyboardButton("🔙 လူစာရင်းသို့ ပြန်သွားရန်", callback_data="back_to_list"))
+
+    if message_id:
+        try:
+            bot.edit_message_text(text, chat_id=chat_id, message_id=message_id, reply_markup=markup, parse_mode="Markdown")
+            return
+        except:
+            pass
+    bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
+
+# လူစာရင်းကို ပြသပေးသည့် အထွေထွေ function
+def send_users_list_view(chat_id, message_id=None):
+    try:
+        response = requests.get(f"{FIREBASE_URL}/users.json")
+        users_dict = response.json()
+    except:
+        users_dict = None
+
+    if not users_dict:
+        text = "⚡ FLASH BETBOT Admin Bot ⚡\n\n📭 လက်ရှိ စာရင်းသွင်းထားသော လူစာရင်း မရှိသေးပါ။"
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton("🔄 Refresh", callback_data="refresh_list"))
+        if message_id:
+            try:
+                bot.edit_message_text(text, chat_id=chat_id, message_id=message_id, reply_markup=markup)
+                return
+            except:
+                pass
+        bot.send_message(chat_id, text, reply_markup=markup)
+        return
+
+    markup = InlineKeyboardMarkup()
+    for check_id, data in users_dict.items():
+        if isinstance(data, dict):
+            tg_name = data.get('tgName', check_id)
+            status = data.get('status', False)
+            icon = "🟢" if status else "🔴"
+            markup.add(InlineKeyboardButton(f"{icon} {tg_name} ({check_id})", callback_data=f"selectuser_{check_id}"))
+
+    markup.add(InlineKeyboardButton("🔄 စာရင်းကိုင် Refresh လုပ်ရန်", callback_data="refresh_list"))
+
+    text = "⚡ FLASH BETBOT Admin Bot ⚡\n\n📋 **ခွင့်ပြုချက်ပေးထားသော / စာရင်းသွင်းထားသော လူစာရင်းများ:**\nအောက်ပါစာရင်းမှ လူတစ်ဦးချင်းစီကို နှိပ်၍ အချိန်သတ်မှတ်နိုင်ပါသည် -"
 
     if message_id:
         try:
@@ -118,36 +165,7 @@ def show_user_panel(chat_id, message_id, check_id):
 # /start Command (သို့မဟုတ် မီနူးခေါ်ရန်)
 @bot.message_handler(commands=['start', 'users', 'list'])
 def send_welcome(message):
-    chat_id = message.chat.id
-    
-    try:
-        response = requests.get(f"{FIREBASE_URL}/users.json")
-        users_dict = response.json()
-    except Exception as e:
-        bot.reply_to(message, f"⚠️ Firebase ချိတ်ဆက်မှု အမှား: {e}")
-        return
-
-    if not users_dict:
-        bot.reply_to(message, "⚡ FLASH BETBOT Admin Bot ⚡\n\n📭 လက်ရှိ စာရင်းသွင်းထားသော လူစာရင်း မရှိသေးပါ။ Check ID ကို တိုက်ရိုက် ပို့ပေးနိုင်ပါသည်။")
-        return
-
-    markup = InlineKeyboardMarkup()
-    for check_id, data in users_dict.items():
-        if isinstance(data, dict):
-            tg_name = data.get('tgName', check_id)
-            status = data.get('status', False)
-            icon = "🟢" if status else "🔴"
-            # နှိပ်လိုက်ရင် အဲ့ဒီ user ရဲ့ panel ထဲ ဝင်သွားမယ်
-            markup.add(InlineKeyboardButton(f"{icon} {tg_name} ({check_id})", callback_data=f"selectuser_{check_id}"))
-
-    markup.add(InlineKeyboardButton("🔄 စာရင်းကိုင် Refresh လုပ်ရန်", callback_data="refresh_list"))
-
-    bot.reply_to(
-        message,
-        "⚡ FLASH BETBOT Admin Bot ⚡\n\n📋 **ခွင့်ပြုချက်ပေးထားသော / စာရင်းသွင်းထားသော လူစာရင်းများ:**\nအောက်ပါစာရင်းမှ လူတစ်ဦးချင်းစီကို နှိပ်၍ အချိန်သတ်မှတ်နိုင်ပါသည် -",
-        reply_markup=markup,
-        parse_mode="Markdown"
-    )
+    send_users_list_view(message.chat.id)
 
 # Check ID ကို စာသားဖြင့် ပို့လာသောအခါ
 @bot.message_handler(func=lambda message: True)
@@ -163,34 +181,7 @@ def callback_query(call):
     message_id = call.message.message_id
 
     if data == "back_to_list" or data == "refresh_list":
-        # လူစာရင်း ပင်မစာမျက်နှာကို ပြန်ပြရန်
-        try:
-            response = requests.get(f"{FIREBASE_URL}/users.json")
-            users_dict = response.json()
-        except:
-            users_dict = None
-
-        if not users_dict:
-            bot.edit_message_text("📭 လက်ရှိ စာရင်းသွင်းထားသော လူစာရင်း မရှိသေးပါ။", chat_id=chat_id, message_id=message_id)
-            return
-
-        markup = InlineKeyboardMarkup()
-        for check_id, data_val in users_dict.items():
-            if isinstance(data_val, dict):
-                tg_name = data_val.get('tgName', check_id)
-                status = data_val.get('status', False)
-                icon = "🟢" if status else "🔴"
-                markup.add(InlineKeyboardButton(f"{icon} {tg_name} ({check_id})", callback_data=f"selectuser_{check_id}"))
-
-        markup.add(InlineKeyboardButton("🔄 စာရင်းကိုင် Refresh လုပ်ရန်", callback_data="refresh_list"))
-
-        bot.edit_message_text(
-            "📋 **ခွင့်ပြုချက်ပေးထားသော / စာရင်းသွင်းထားသော လူစာရင်းများ:**\nအောက်ပါစာရင်းမှ လူတစ်ဦးချင်းစီကို နှိပ်၍ အချိန်သတ်မှတ်နိုင်ပါသည် -",
-            chat_id=chat_id,
-            message_id=message_id,
-            reply_markup=markup,
-            parse_mode="Markdown"
-        )
+        send_users_list_view(chat_id, message_id)
         return
 
     if data.startswith("selectuser_"):
@@ -198,12 +189,19 @@ def callback_query(call):
         show_user_panel(chat_id, message_id, check_id)
         return
 
-    data_parts = data.split('_')
+    data_parts = data.split('_', 1)
     if len(data_parts) < 2:
         return
         
     action = data_parts[0]
     check_id = data_parts[1]
+
+    # 🗑️ လုံးဝ ဖျက်ပစ်မည့် လုပ်ဆောင်ချက်
+    if action == "delete":
+        requests.delete(f"{FIREBASE_URL}/users/{check_id}.json")
+        bot.answer_callback_query(call.id, text=f"🗑️ {check_id} ကို စာရင်းထဲမှ ဖျက်ပစ်လိုက်ပါပြီ။")
+        send_users_list_view(chat_id, message_id)
+        return
 
     try:
         response = requests.get(f"{FIREBASE_URL}/users/{check_id}.json")
