@@ -44,7 +44,6 @@ def handle_message(message):
     check_id = message.text.strip().upper()
     
     try:
-        # Firebase REST API ဖြင့် credentials လုံးဝမလိုဘဲ တိုက်ရိုက်လှမ်းယူခြင်း
         response = requests.get(f"{FIREBASE_URL}/users/{check_id}.json")
         user_data = response.json()
     except Exception as e:
