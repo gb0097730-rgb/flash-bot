@@ -1,4 +1,5 @@
 import os
+import time
 import requests
 from flask import Flask, request
 import telebot
@@ -67,8 +68,10 @@ def handle_message(message):
 
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton("♾️ အမြဲတမ်း ဖွင့်မည် (Always)", callback_data=f"always_{check_id}"))
-    markup.add(InlineKeyboardButton("⏱️ ၁ မိနစ် ဖွင့်မည် (Timed 1m)", callback_data=f"timed1_{check_id}"))
-    markup.add(InlineKeyboardButton("⏱️ ၁၀ မိနစ် ဖွင့်မည် (Timed 10m)", callback_data=f"timed10_{check_id}"))
+    markup.add(InlineKeyboardButton("⏱️ ၁ မိနစ် (Timed 1m)", callback_data=f"timed1_{check_id}"))
+    markup.add(InlineKeyboardButton("⏱️ ၅ မိနစ် (Timed 5m)", callback_data=f"timed5_{check_id}"))
+    markup.add(InlineKeyboardButton("⏱️ ၁၀ မိနစ် (Timed 10m)", callback_data=f"timed10_{check_id}"))
+    markup.add(InlineKeyboardButton("⏱️ မိနစ် ၃၀ (Timed 30m)", callback_data=f"timed30_{check_id}"))
     markup.add(InlineKeyboardButton("❌ အကောင့်ပိတ်မည် (Block)", callback_data=f"block_{check_id}"))
 
     bot.reply_to(message, text, reply_markup=markup, parse_mode="Markdown")
@@ -87,6 +90,7 @@ def callback_query(call):
         user_data = None
     
     tg_name = user_data.get('tgName', '') if user_data else ''
+    current_time = int(time.time() * 1000)
 
     if action == "always":
         requests.patch(f"{FIREBASE_URL}/users/{check_id}.json", json={
@@ -102,10 +106,11 @@ def callback_query(call):
             parse_mode="Markdown"
         )
 
-    elif action == "timed1":
-        duration_ms = 1 * 60 * 1000  # ၁ မိနစ်
-        import time
-        current_time = int(time.time() * 1000)
+    elif action.startswith("timed"):
+        # မိနစ်ပမာဏကို ဖြတ်ထုတ်ယူခြင်း (ဥပမာ timed5 ဆိုလျှင် 5 ကိုယူမည်)
+        mins = int(action.replace("timed", ""))
+        duration_ms = mins * 60 * 1000
+        
         requests.patch(f"{FIREBASE_URL}/users/{check_id}.json", json={
             'status': True,
             'mode': 'timed',
@@ -113,24 +118,7 @@ def callback_query(call):
             'duration': duration_ms
         })
         bot.edit_message_text(
-            f"✅ Check ID: `{check_id}` ({tg_name}) ကို *၁ မိနစ်* စာ အောင်မြင်စွာ ဖွင့်ပေးလိုက်ပါပြီ။",
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            parse_mode="Markdown"
-        )
-
-    elif action == "timed10":
-        duration_ms = 10 * 60 * 1000  # ၁၀ မိနစ်
-        import time
-        current_time = int(time.time() * 1000)
-        requests.patch(f"{FIREBASE_URL}/users/{check_id}.json", json={
-            'status': True,
-            'mode': 'timed',
-            'startTime': current_time,
-            'duration': duration_ms
-        })
-        bot.edit_message_text(
-            f"✅ Check ID: `{check_id}` ({tg_name}) ကို *၁၀ မိနစ်* စာ အောင်မြင်စွာ ဖွင့်ပေးလိုက်ပါပြီ။",
+            f"✅ Check ID: `{check_id}` ({tg_name}) ကို *{mins} မိနစ်* စာ အောင်မြင်စွာ ဖွင့်ပေးလိုက်ပါပြီ။",
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
             parse_mode="Markdown"
