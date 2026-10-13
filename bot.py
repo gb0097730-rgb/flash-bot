@@ -1,5 +1,7 @@
 import os
 import time
+import threading
+from flask import Flask
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from firebase_admin import initialize_app, db
@@ -7,6 +9,13 @@ from firebase_admin import initialize_app, db
 # Bot Token အသစ်
 TOKEN = "8746808077:AAHw3PnbPiy_f4gSdDMMrZg-mi2CvH0205o"
 bot = telebot.TeleBot(TOKEN)
+
+# Flask App (Render ဆာဗာ Port ပွင့်နေစေရန်)
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Flash Bot is Live and Active!"
 
 # Firebase Database ချိတ်ဆက်ခြင်း
 try:
@@ -30,7 +39,6 @@ def send_welcome(message):
 def handle_message(message):
     check_id = message.text.strip().upper()
     
-    # Firebase တွင် ဒေတာရှာဖွေခြင်း (users အောက်တွင် ရှိမရှိ စစ်ဆေးမည်)
     try:
         ref = db.reference(f'users/{check_id}')
         user_data = ref.get()
@@ -41,8 +49,7 @@ def handle_message(message):
     if not user_data:
         bot.reply_to(
             message, 
-            f"❌ '{check_id}' ကို Firebase ၏ `users/{check_id}` နေရာတွင် ရှာမတွေ့ပါ။\n\n"
-            "ကျေးဇူးပြု၍ Firebase Console ထဲတွင် data structure က `users` အောက်မှာ Check ID တွေ ရှိရဲ့လား သေချာစစ်ဆေးပေးပါ။"
+            f"❌ '{check_id}' ကို Firebase ၏ `users/{check_id}` နေရာတွင် ရှာမတွေ့ပါ။"
         )
         return
 
@@ -133,6 +140,17 @@ def callback_query(call):
             parse_mode="Markdown"
         )
 
-if __name__ == "__main__":
-    print("Bot is starting...")
+# Telegram Bot ကို Background တွင် Run ခြင်း
+def run_telegram_bot():
+    print("Telegram Bot is starting...")
     bot.infinity_polling(skip_pending=True)
+
+if __name__ == "__main__":
+    # Bot ကို Thread ဖြင့် စတင်မည်
+    bot_thread = threading.Thread(target=run_telegram_bot)
+    bot_thread.daemon = True
+    bot_thread.start()
+
+    # Flask Web Server ကို Render Port ဖြင့် စတင်မည် (Port Error မတက်စေရန်)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
